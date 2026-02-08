@@ -77,59 +77,58 @@ export default function Home() {
     const processResults = (data) => {
         let novosRoteiros = [];
 
-        // Lógica de normalização dos dados
+        // Lógica de Extração Profunda
+        // O objetivo é encontrar objetos que tenham 'ideia_copy' ou 'roteiro_completo'
+        // independentemente de como estejam aninhados (receivedData, data, data.data, ou array direto)
+        
+        const extractCandidate = (item) => {
+            if (!item) return [];
+            
+            // Caso ideal: item já é o roteiro
+            if (item.ideia_copy || item.visual) return [item];
+            
+            // Caso com wrapper 'receivedData' (n8n envia assim às vezes)
+            if (item.receivedData) return extractCandidate(item.receivedData);
+
+            // Caso com wrapper 'json' (alguns nodes n8n)
+            if (item.json) return extractCandidate(item.json);
+
+            // Caso seja um wrapper de API { data: ... }
+            if (item.data) {
+                if (Array.isArray(item.data)) return item.data.flatMap(extractCandidate);
+                return extractCandidate(item.data);
+            }
+
+            return []; // Não é um roteiro válido
+        };
+
         if (Array.isArray(data)) {
-            novosRoteiros = data.flatMap(item => {
-                // Se o item tem 'receivedData' (caso do nosso Webhook), usa ele
-                if (item.receivedData) return item.receivedData;
-                
-                // Casos legados ou outras estruturas
-                if (item.data && Array.isArray(item.data)) return item.data;
-                
-                return item;
-            });
-        } else if (data.data && Array.isArray(data.data)) {
-            // Caso venha envelopado em um objeto { data: [...] }
-            novosRoteiros = data.data.map(item => item.receivedData || item);
+            novosRoteiros = data.flatMap(extractCandidate);
         } else {
-            // Objeto único
-            novosRoteiros = [data.receivedData || data];
+            novosRoteiros = extractCandidate(data);
         }
-
-        // Flatten novamente por segurança
-        novosRoteiros = novosRoteiros.flat();
-
-        // Filtrar vazios
-        novosRoteiros = novosRoteiros.filter(item => item && (
-            item.ideia_copy || 
-            item.visual || 
-            (item.json && item.json.ideia_copy)
-        ));
 
         if (novosRoteiros.length > 0) {
             setResults((prevResults) => {
                 const atuais = prevResults || [];
-                
-                // Cria um Map para remover duplicatas baseado na ideia_copy (chave única assumida)
                 const mapa = new Map();
                 
-                // Adiciona os atuais
-                atuais.forEach(item => {
-                    const key = item.ideia_copy || JSON.stringify(item);
-                    mapa.set(key, item);
-                });
+                // Função para gerar chave única do roteiro
+                const getKey = (r) => {
+                    // Tenta usar a ideia como ID, ou o começo do roteiro
+                    return r.ideia_copy ? r.ideia_copy.substring(0, 50) : JSON.stringify(r).substring(0, 50);
+                };
 
-                // Adiciona/Atualiza com os novos
-                novosRoteiros.forEach(item => {
-                    const key = item.ideia_copy || JSON.stringify(item);
-                    mapa.set(key, item);
-                });
+                // Reconstrói o mapa com os atuais
+                atuais.forEach(item => mapa.set(getKey(item), item));
 
-                // Converte de volta para array
+                // Adiciona novos (sobrescrevendo se idênticos)
+                novosRoteiros.forEach(item => mapa.set(getKey(item), item));
+
                 return Array.from(mapa.values());
             });
 
-            setStatusMessage({ type: 'success', text: 'Recebendo roteiros...' });
+            setStatusMessage({ type: 'success', text: `Recebidos ${novosRoteiros.length} novos roteiros...` });
             setLoading(false); 
             setError('');
         }

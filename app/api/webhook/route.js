@@ -1,47 +1,60 @@
 import { NextResponse } from 'next/server';
 
-// Armazena os últimos itens recebidos (buffer circular simples)
-const MAX_ITEMS = 20;
+// Buffer circular simples em memória volátil
+const MAX_ITEMS = 50;
 let webhookBuffer = [];
 
 export async function GET() {
-  // Retorna o buffer completo (array de objetos)
-  return NextResponse.json({ data: webhookBuffer });
+  // Retorna tudo o que esta instância tem na memória
+  return NextResponse.json({ 
+    data: webhookBuffer,
+    // Debug: ver qual server respondeu
+    instance: Math.random().toString(36).substring(7) 
+  });
 }
 
 export async function DELETE() {
   webhookBuffer = [];
-  return NextResponse.json({ message: 'Buffer limpo' });
+  return NextResponse.json({ message: 'Buffer limpo nesta instância' });
 }
 
 export async function POST(request) {
   try {
     const data = await request.json();
+    console.log('Recebido:', typeof data);
 
-    console.log('Dado recebido:', data);
-    
-    // Adiciona ao buffer
-    // Se for um array, adiciona os itens individuais
+    let itemsToAdd = [];
+
+    // Normaliza a entrada para garantir que é um array de roteiros
     if (Array.isArray(data)) {
-        webhookBuffer.push(...data);
+        itemsToAdd = data;
     } else {
-        webhookBuffer.push(data);
+        itemsToAdd = [data];
     }
 
-    // Mantém apenas os últimos itens para não estourar memória
+    // Estratégia híbrida para resolver fragmentação:
+    // 1. Se recebermos um lote grande (3+ itens), assumimos que é a carga completa e substituímos o buffer.
+    // 2. Se recebermos pingado, acumulamos.
+    if (itemsToAdd.length >= 3) {
+        webhookBuffer = [...itemsToAdd];
+    } else {
+        webhookBuffer.push(...itemsToAdd);
+    }
+
+    // Limite de segurança
     if (webhookBuffer.length > MAX_ITEMS) {
         webhookBuffer = webhookBuffer.slice(-MAX_ITEMS);
     }
 
     return NextResponse.json(
-      { message: 'Recebido e armazenado', count: webhookBuffer.length },
+      { 
+        message: 'Recebido com sucesso', 
+        count: webhookBuffer.length 
+      },
       { status: 200 }
     );
   } catch (error) {
-    console.error('Erro ao processar o POST:', error);
-    return NextResponse.json(
-      { error: 'Falha ao processar a requisição.' },
-      { status: 500 }
-    );
+    console.error('Erro no Webhook:', error);
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
