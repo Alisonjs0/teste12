@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { Copy, Check, Search, X, Loader2, Play, RefreshCw, Plus } from 'lucide-react';
+import { Copy, Check, Search, X, Loader2, Play, RefreshCw, Plus, FileText, Download } from 'lucide-react';
 
 const WEBHOOK_URL = '/api/generate'; // Proxy local para evitar CORS e ocultar URL real
 
@@ -193,6 +193,75 @@ export default function Home() {
         setStatusMessage(null);
     };
 
+    const generateWordDoc = () => {
+        if (!results || results.length === 0) return;
+
+        let contentHtml = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head><meta charset='utf-8'><title>Relatório de Ideias</title></head>
+            <body style="font-family: Arial, sans-serif;">
+            <h1 style="text-align: center; color: #4F46E5;">Relatório de Ideias e Roteiros</h1>
+            <p style="text-align: center; color: #666;">Gerado em ${new Date().toLocaleDateString()} às ${new Date().toLocaleTimeString()}</p>
+            <br/>
+        `;
+
+        results.forEach((item, index) => {
+            const ideia = item.ideia_copy || item.json?.ideia_copy || '';
+            const publico = item.publico_target || item.json?.publico_target || '';
+            const visual = item.visual || item.json?.visual || '';
+            const legenda = item.legenda || item.json?.legenda || '';
+            const locucao = item.locucao || item.json?.locucao || '';
+            const cta = item.cta_final || item.json?.cta_final || '';
+
+            contentHtml += `
+                <div style="border: 2px solid #ccc; padding: 20px; margin-bottom: 30px; border-radius: 8px;">
+                    <h2 style="background-color: #EEF2FF; padding: 10px; border-radius: 4px; border-left: 5px solid #4F46E5; margin-top: 0;">Opção #${index + 1}: ${ideia.substring(0, 50)}...</h2>
+                    
+                    <h3 style="color: #4338CA;">💡 Ideia Central</h3>
+                    <p style="background-color: #F8FAFC; padding: 10px; border-left: 4px solid #4338CA;">${ideia}</p>
+
+                    <h3 style="color: #C2410C;">👥 Público-Alvo</h3>
+                    <p style="background-color: #FFF7ED; padding: 10px; border-left: 4px solid #F97316;">${publico}</p>
+
+                    <h3 style="color: #374151;">🎬 Roteiro</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #ddd;">
+                        <tr>
+                            <td style="background-color: #F1F5F9; font-weight: bold; padding: 10px; width: 20%; border: 1px solid #ddd;">📹 Visual</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${visual}</td>
+                        </tr>
+                        <tr>
+                            <td style="background-color: #F1F5F9; font-weight: bold; padding: 10px; border: 1px solid #ddd;">📝 Legenda</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${legenda}</td>
+                        </tr>
+                        <tr>
+                            <td style="background-color: #F1F5F9; font-weight: bold; padding: 10px; border: 1px solid #ddd;">🎙️ Locução</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${locucao}</td>
+                        </tr>
+                    </table>
+
+                    <div style="margin-top: 20px; padding: 15px; background-color: #3730A3; color: white; text-align: center; border-radius: 6px; font-weight: bold;">
+                        🚀 CTA: ${cta}
+                    </div>
+                </div>
+                <br/>
+            `;
+        });
+
+        contentHtml += "</body></html>";
+
+        const blob = new Blob(['\ufeff', contentHtml], {
+            type: 'application/msword'
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Relatorio_Roteiros_${new Date().getTime()}.doc`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <main className="min-h-screen p-4 md:p-10 flex items-center justify-center">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl p-6 md:p-10">
@@ -322,10 +391,18 @@ export default function Home() {
                 {/* Results Section */}
                 {results && (
                     <div className="animate-slide-up">
-                        <div className="border-b-2 border-indigo-500 pb-4 mb-8">
-                            <h2 className="text-2xl font-bold text-gray-800">📊 Resultados</h2>
+                        <div className="flex flex-col md:flex-row justify-between items-center border-b-2 border-indigo-500 pb-4 mb-8 gap-4">
+                            <h2 className="text-2xl font-bold text-gray-800">📊 Resultados ({results.length})</h2>
+                            
+                            <button 
+                                onClick={generateWordDoc}
+                                className="flex items-center gap-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-2 rounded-lg font-medium transition-colors"
+                            >
+                                <Download size={18} /> Baixar Relatório (.doc)
+                            </button>
                         </div>
-                        <div className="space-y-8">
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min">
                             {results.map((item, index) => (
                                 <RoteiroCard key={index} item={item} number={index + 1} />
                             ))}
