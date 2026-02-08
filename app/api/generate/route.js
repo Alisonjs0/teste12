@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const WEBHOOK_URL = 'https://n8n.smartcora.cloud/webhook-test/fd95dc0d-06c7-48ab-ab73-5a5090ffe94c';
+const WEBHOOK_URL = 'https://n8n.smartcora.cloud/webhook/fd95dc0d-06c7-48ab-ab73-5a5090ffe94c';
 
 export async function POST(request) {
   try {
