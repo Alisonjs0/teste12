@@ -292,30 +292,6 @@ export default function Home() {
                     <p className="text-gray-500">Gere roteiros e ideias de copy baseados em anúncios de concorrentes</p>
                 </div>
 
-                {/* Webhook Data Display - NEW */}
-                {webhookData && (
-                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6 mb-8 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-bold text-indigo-900 flex items-center gap-2">
-                                📡 Dados Recebidos via API
-                            </h2>
-                            <button 
-                                onClick={() => { setWebhookData(null); lastWebhookDataRef.current = null; }}
-                                className="text-indigo-400 hover:text-indigo-700 transition"
-                                title="Limpar visualização"
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="bg-white p-4 rounded border border-indigo-100 font-mono text-sm text-gray-700 overflow-x-auto">
-                            <pre>{JSON.stringify(webhookData, null, 2)}</pre>
-                        </div>
-                        <div className="mt-2 text-xs text-indigo-400 text-right">
-                            Recebido em: {new Date().toLocaleTimeString()}
-                        </div>
-                    </div>
-                )}
-
                 {/* Form Section */}
                 <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-8">
                     <form onSubmit={handleSubmit}>
@@ -422,7 +398,7 @@ export default function Home() {
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min">
+                        <div className="grid grid-cols-1 gap-8">
                             {results.map((item, index) => (
                                 <RoteiroCard key={index} item={item} number={index + 1} />
                             ))}
