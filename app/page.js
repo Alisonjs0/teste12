@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Copy, Check, Search, X, Loader2, Play, RefreshCw, Plus } from 'lucide-react';
 
-const WEBHOOK_URL = 'https://n8n.smartcora.cloud/webhook-test/fd95dc0d-06c7-48ab-ab73-5a5090ffe94c';
+const WEBHOOK_URL = '/api/generate'; // Proxy local para evitar CORS e ocultar URL real
 
 const PRESET_TERMS = {
     loja: [
@@ -54,23 +54,51 @@ export default function Home() {
                 const res = await fetch('/api/webhook', { cache: 'no-store' });
                 if (res.ok) {
                     const json = await res.json();
-                    // Só atualiza se houver dados e forem diferentes dos anteriores
                     if (json.data) {
                         const dataStr = JSON.stringify(json.data);
                         if (dataStr !== lastWebhookDataRef.current) {
                             setWebhookData(json.data);
                             lastWebhookDataRef.current = dataStr;
-                            setStatusMessage({ type: 'success', text: 'Novos dados recebidos do Webhook!' });
+                            
+                            // Processa os dados automaticamente quando chegarem
+                            processResults(json.data);
                         }
                     }
                 }
             } catch (err) {
                 console.error("Erro no polling do webhook:", err);
             }
-        }, 2000); // Verifica a cada 2 segundos
+        }, 2000); 
 
         return () => clearInterval(interval);
     }, []);
+
+    // Função separada para processar os resultados
+    const processResults = (data) => {
+        let roteiros = [];
+
+        // Lógica de normalização dos dados
+        if (Array.isArray(data)) {
+            roteiros = data.flatMap(item => {
+                if (item.data && Array.isArray(item.data)) return item.data;
+                return item;
+            });
+        } else if (data.data && Array.isArray(data.data)) {
+            roteiros = data.data;
+        } else {
+            roteiros = [data];
+        }
+
+        // Filtrar vazios
+        roteiros = roteiros.filter(item => item && (item.ideia_copy || item.visual || (item.json && item.json.ideia_copy)));
+
+        if (roteiros.length > 0) {
+            setResults(roteiros);
+            setStatusMessage({ type: 'success', text: 'Relatório gerado e recebido com sucesso!' });
+            setLoading(false); // Para o loading quando os dados chegam
+            setError('');
+        }
+    };
 
     // Fechar sugestões ao clicar fora
     useEffect(() => {
@@ -139,42 +167,21 @@ export default function Home() {
         setStatusMessage(null);
 
         try {
-            const response = await axios.post(WEBHOOK_URL, {
+            // Dispara a geração via Proxy
+            await axios.post(WEBHOOK_URL, {
                 searchTerms: termsToSend,
                 message: termsToSend.join(', ')
             });
-
-            const data = response.data;
-            let roteiros = [];
-
-            // Lógica de normalização dos dados (igual ao fix anterior)
-            if (Array.isArray(data)) {
-                roteiros = data.flatMap(item => {
-                    if (item.data && Array.isArray(item.data)) return item.data;
-                    return item;
-                });
-            } else if (data.data && Array.isArray(data.data)) {
-                roteiros = data.data;
-            } else {
-                roteiros = [data];
-            }
-
-            // Filtrar vazios
-            roteiros = roteiros.filter(item => item && (item.ideia_copy || item.visual || (item.json && item.json.ideia_copy)));
-
-            if (roteiros.length === 0) {
-                if (data.error) setError(data.error);
-                else setError('Nenhum roteiro encontrado.');
-            } else {
-                setResults(roteiros);
-                setStatusMessage({ type: 'success', text: 'Relatório gerado com sucesso!' });
-            }
+            
+            // Não esperamos processar o resultado IMEDIATO do axios.
+            // Apenas notificamos que foi enviado e deixamos o loading ativo e o polling (useEffect) pegar o resultado.
+            setStatusMessage({ type: 'success', text: 'Solicitação enviada! Aguardando resposta do gerador...' });
+            // O setLoading(false) NÃO é chamado aqui, pois queremos continuar esperando o Webhook
 
         } catch (err) {
             console.error(err);
-            setError('Erro ao conectar com o servidor. Tente novamente.');
-        } finally {
-            setLoading(false);
+            setError('Erro ao enviar solicitação para o servidor. Tente novamente.');
+            setLoading(false); // Só para o loading se der erro no envio
         }
     };
 
