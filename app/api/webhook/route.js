@@ -32,16 +32,11 @@ export async function POST(request) {
         itemsToAdd = [data];
     }
 
-    // Estratégia híbrida para resolver fragmentação:
-    // 1. Se recebermos um lote grande (3+ itens), assumimos que é a carga completa e substituímos o buffer.
-    // 2. Se recebermos pingado, acumulamos.
-    if (itemsToAdd.length >= 3) {
-        webhookBuffer = [...itemsToAdd];
-    } else {
-        webhookBuffer.push(...itemsToAdd);
-    }
+    // Estratégia de Acumulação: Sempre adiciona ao fim.
+    // Nunca substituímos os dados, para evitar perder informações se o frontend demorar a buscar.
+    webhookBuffer.push(...itemsToAdd);
 
-    // Limite de segurança
+    // Limite de segurança (FIFO - remove os mais antigos se passar do limite)
     if (webhookBuffer.length > MAX_ITEMS) {
         webhookBuffer = webhookBuffer.slice(-MAX_ITEMS);
     }
