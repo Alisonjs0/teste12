@@ -1,27 +1,40 @@
 import { NextResponse } from 'next/server';
 
-// Simulação de banco de dados em memória (limpo ao reiniciar o servidor)
-let lastReceivedData = null;
+// Armazena os últimos itens recebidos (buffer circular simples)
+const MAX_ITEMS = 20;
+let webhookBuffer = [];
 
 export async function GET() {
-  return NextResponse.json({ data: lastReceivedData });
+  // Retorna o buffer completo (array de objetos)
+  return NextResponse.json({ data: webhookBuffer });
+}
+
+export async function DELETE() {
+  webhookBuffer = [];
+  return NextResponse.json({ message: 'Buffer limpo' });
 }
 
 export async function POST(request) {
   try {
-    // Ler o corpo da requisição (JSON)
     const data = await request.json();
 
-    console.log('Dados recebidos:', data);
+    console.log('Dado recebido:', data);
     
-    // Armazena os dados na variável global
-    lastReceivedData = data;
+    // Adiciona ao buffer
+    // Se for um array, adiciona os itens individuais
+    if (Array.isArray(data)) {
+        webhookBuffer.push(...data);
+    } else {
+        webhookBuffer.push(data);
+    }
 
-    // Aqui você pode processar os dados recebidos
-    // Por exemplo: salvar no banco de dados, disparar uma ação, etc.
+    // Mantém apenas os últimos itens para não estourar memória
+    if (webhookBuffer.length > MAX_ITEMS) {
+        webhookBuffer = webhookBuffer.slice(-MAX_ITEMS);
+    }
 
     return NextResponse.json(
-      { message: 'Post recebido com sucesso!', receivedData: data },
+      { message: 'Recebido e armazenado', count: webhookBuffer.length },
       { status: 200 }
     );
   } catch (error) {

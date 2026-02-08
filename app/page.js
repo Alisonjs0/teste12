@@ -80,17 +80,33 @@ export default function Home() {
         // Lógica de normalização dos dados
         if (Array.isArray(data)) {
             roteiros = data.flatMap(item => {
+                // Se o item tem 'receivedData' (caso do nosso Webhook), usa ele
+                if (item.receivedData) return item.receivedData;
+                
+                // Casos legados ou outras estruturas
                 if (item.data && Array.isArray(item.data)) return item.data;
+                
                 return item;
             });
         } else if (data.data && Array.isArray(data.data)) {
-            roteiros = data.data;
+            // Caso venha envelopado em um objeto { data: [...] }
+            roteiros = data.data.map(item => item.receivedData || item);
         } else {
-            roteiros = [data];
+            // Objeto único
+            roteiros = [data.receivedData || data];
         }
 
+        // Flatten novamente por segurança, caso algum mapping tenha retornado arrays
+        roteiros = roteiros.flat();
+
+        console.log("Roteiros processados:", roteiros);
+
         // Filtrar vazios
-        roteiros = roteiros.filter(item => item && (item.ideia_copy || item.visual || (item.json && item.json.ideia_copy)));
+        roteiros = roteiros.filter(item => item && (
+            item.ideia_copy || 
+            item.visual || 
+            (item.json && item.json.ideia_copy)
+        ));
 
         if (roteiros.length > 0) {
             setResults(roteiros);
@@ -167,6 +183,10 @@ export default function Home() {
         setStatusMessage(null);
 
         try {
+            
+            // Limpa o buffer antigo antes de uma nova solicitação
+            await axios.delete('/api/webhook');
+
             // Dispara a geração via Proxy
             await axios.post(WEBHOOK_URL, {
                 searchTerms: termsToSend,
