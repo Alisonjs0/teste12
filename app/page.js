@@ -75,11 +75,11 @@ export default function Home() {
 
     // Função separada para processar os resultados
     const processResults = (data) => {
-        let roteiros = [];
+        let novosRoteiros = [];
 
         // Lógica de normalização dos dados
         if (Array.isArray(data)) {
-            roteiros = data.flatMap(item => {
+            novosRoteiros = data.flatMap(item => {
                 // Se o item tem 'receivedData' (caso do nosso Webhook), usa ele
                 if (item.receivedData) return item.receivedData;
                 
@@ -90,28 +90,47 @@ export default function Home() {
             });
         } else if (data.data && Array.isArray(data.data)) {
             // Caso venha envelopado em um objeto { data: [...] }
-            roteiros = data.data.map(item => item.receivedData || item);
+            novosRoteiros = data.data.map(item => item.receivedData || item);
         } else {
             // Objeto único
-            roteiros = [data.receivedData || data];
+            novosRoteiros = [data.receivedData || data];
         }
 
-        // Flatten novamente por segurança, caso algum mapping tenha retornado arrays
-        roteiros = roteiros.flat();
-
-        console.log("Roteiros processados:", roteiros);
+        // Flatten novamente por segurança
+        novosRoteiros = novosRoteiros.flat();
 
         // Filtrar vazios
-        roteiros = roteiros.filter(item => item && (
+        novosRoteiros = novosRoteiros.filter(item => item && (
             item.ideia_copy || 
             item.visual || 
             (item.json && item.json.ideia_copy)
         ));
 
-        if (roteiros.length > 0) {
-            setResults(roteiros);
-            setStatusMessage({ type: 'success', text: 'Relatório gerado e recebido com sucesso!' });
-            setLoading(false); // Para o loading quando os dados chegam
+        if (novosRoteiros.length > 0) {
+            setResults((prevResults) => {
+                const atuais = prevResults || [];
+                
+                // Cria um Map para remover duplicatas baseado na ideia_copy (chave única assumida)
+                const mapa = new Map();
+                
+                // Adiciona os atuais
+                atuais.forEach(item => {
+                    const key = item.ideia_copy || JSON.stringify(item);
+                    mapa.set(key, item);
+                });
+
+                // Adiciona/Atualiza com os novos
+                novosRoteiros.forEach(item => {
+                    const key = item.ideia_copy || JSON.stringify(item);
+                    mapa.set(key, item);
+                });
+
+                // Converte de volta para array
+                return Array.from(mapa.values());
+            });
+
+            setStatusMessage({ type: 'success', text: 'Recebendo roteiros...' });
+            setLoading(false); 
             setError('');
         }
     };
